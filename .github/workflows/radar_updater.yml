@@ -5,11 +5,6 @@ on:
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
-# This explicitly tells 
-
-# GitHub
-
-# to allow the bot to save files
 permissions:
   contents: write
 
@@ -25,17 +20,18 @@ jobs:
       with:
         python-version: '3.10'
 
+    # Automatically install requirements cleanly 
     - name: Install dependencies
       run: pip install requests beautifulsoup4
 
+    # Run the exact code block to download the image bytes
     - name: Run the updater script
       run: python update_radar.py
 
-    - name: Commit and push the updated image back to GitHub
-      run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git add latest_radar.png
-        git commit -m "Update radar image to latest" || exit 0
-        git push origin main
+    # Bypasses Exit Code 128 by routing file pushes through an official pre-authenticated module
+    - name: Auto-Commit and Push File
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: "Update radar image to latest"
+        file_pattern: 'latest_radar.png'
         
