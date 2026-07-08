@@ -1,15 +1,10 @@
 <?xml version="1.0" ?>
 <trmnl_data>
   <metadata>
-    <fetched_at_epoch>1783530971</fetched_at_epoch>
-    <fetched_at_human>2026-07-08 17:16:11</fetched_at_human>
-    <radar_observed_time>2026-07-08 17:10 UTC</radar_observed_time>
+    <fetched_at_epoch>1783533080</fetched_at_epoch>
+    <fetched_at_human>2026-07-08 17:51:20</fetched_at_human>
+    <radar_observed_time>2026-07-08 17:45 UTC</radar_observed_time>
+    <radar_image_file>https://raw.githubusercontent.com/hatmmmmmmm/met-radar-sync/main/latest_radar.png</radar_image_file>
   </metadata>
-  <budapest_current>
-    <temperature>23°C</temperature>
-    <condition>Mérsékelten felhős</condition>
-  </budapest_current>
-  <forecasts>
-    <national_summary>Helyenként záporok és tiszta égbolt váltakozása várható.</national_summary>
-  </forecasts>
+  <budapest_forecast/>
 </trmnl_data>
