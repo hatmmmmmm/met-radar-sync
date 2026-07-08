@@ -12,7 +12,13 @@ def main():
     }
 
     radar_time_human = "Unknown"
+    local_image_filename = "latest_radar.png"
     
+    # Configuration for your public GitHub asset link
+    github_user = "hatmmmmmmm"
+    github_repo = "met-radar-sync"
+    public_image_url = f"https://raw.githubusercontent.com/{github_user}/{github_repo}/main/{local_image_filename}"
+
     # ==========================================
     # 1. DOWNLOAD LATEST HIGH-RES ODP RADAR
     # ==========================================
@@ -30,7 +36,7 @@ def main():
                 latest_filename = sorted(png_links)[-1]
                 target_image_url = odp_radar_dir + latest_filename
                 
-                # Capture exact 5-minute file window
+                # Capture exact 5-minute file window from filename
                 time_match = re.search(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})", latest_filename)
                 if time_match:
                     year, month, day, hour, minute = time_match.groups()
@@ -38,9 +44,9 @@ def main():
                 
                 img_resp = requests.get(target_image_url, headers=headers, timeout=20)
                 if img_resp.status_code == 200:
-                    if os.path.exists("latest_radar.png"):
-                        os.remove("latest_radar.png")
-                    with open("latest_radar.png", "wb") as f:
+                    if os.path.exists(local_image_filename):
+                        os.remove(local_image_filename)
+                    with open(local_image_filename, "wb") as f:
                         f.write(img_resp.content)
                     print(f"Verified Radar Map pulled: {latest_filename}")
     except Exception as e:
@@ -56,6 +62,7 @@ def main():
     ET.SubElement(meta, "fetched_at_epoch").text = str(int(time.time()))
     ET.SubElement(meta, "fetched_at_human").text = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
     ET.SubElement(meta, "radar_observed_time").text = radar_time_human
+    ET.SubElement(meta, "radar_image_file").text = public_image_url
 
     forecast_node = ET.SubElement(root, "budapest_forecast")
     
@@ -64,41 +71,5 @@ def main():
         print("Reading ODP FOCUS structural forecast metrics...")
         focus_data = requests.get(odp_focus_url, headers=headers, timeout=15).json()
         
-        # Isolate Budapest forecast matrices
         if "Budapest" in focus_data:
-            bp_forecast = focus_data["Budapest"]
-            
-            # loop through the keys inside the data dictionary dynamically
-            for day_key, day_metrics in sorted(bp_forecast.items()):
-                # Strips out generic structural elements if they appear, keeping dates (e.g. "2026-07-08")
-                if not re.match(r"\d{4}-\d{2}-\d{2}", day_key):
-                    continue
-                    
-                day_element = ET.SubElement(forecast_node, "day", date=day_key)
-                
-                # Extract structural keys directly mapped from the chart layout
-                ET.SubElement(day_element, "temp_max").text = f"{day_metrics.get('Tmax', 'N/A')}°C"
-                ET.SubElement(day_element, "temp_min").text = f"{day_metrics.get('Tmin', 'N/A')}°C"
-                ET.SubElement(day_element, "wind_speed_max").text = f"{day_metrics.get('Wmax', 'N/A')} km/h"
-                ET.SubElement(day_element, "wind_speed_avg").text = f"{day_metrics.get('Wavg', 'N/A')} km/h"
-                ET.SubElement(day_element, "wind_direction").text = str(day_metrics.get("Wdir", "N/A"))
-                ET.SubElement(day_element, "cloud_icon_index").text = str(day_metrics.get("weather_type", "N/A"))
-                ET.SubElement(day_element, "precipitation_mm").text = f"{day_metrics.get('Precip', '0')} mm"
-        else:
-            print("Budapest segment was not found in focus.json file.")
-    except Exception as e:
-        print(f"Failed parsing numerical forecast grid: {e}")
-
-    # ==========================================
-    # 3. EXPORT CLEAN FORMATTED XML ASSET
-    # ==========================================
-    xml_str = ET.tostring(root, encoding="utf-8")
-    parsed_xml = minidom.parseString(xml_str)
-    pretty_xml = parsed_xml.toprettyxml(indent="  ")
-    
-    with open("weather_data.xml", "w", encoding="utf-8") as f:
-        f.write(pretty_xml)
-    print("Success! Multi-day matrix written to weather_data.xml.")
-
-if __name__ == "__main__":
-    main()
+            bp
