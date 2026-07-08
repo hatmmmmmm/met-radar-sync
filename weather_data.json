@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "fetched_at_epoch": 1783537509,
-    "fetched_at_human": "2026-07-08 19:05:09",
-    "radar_observed_time": "2026-07-08 18:55 UTC",
+    "fetched_at_epoch": 1783537673,
+    "fetched_at_human": "2026-07-08 19:07:53",
+    "radar_observed_time": "2026-07-08 19:00 UTC",
     "radar_image_file": "https://raw.githubusercontent.com/hatmmmmmm/met-radar-sync/main/latest_radar.png"
   },
   "budapest_forecast": []
