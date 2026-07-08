@@ -8,20 +8,20 @@ from PIL import Image
 
 def process_radar_image(image_path):
     """
-    Strips away the background geography map and converts any 
-    precipitation metrics into solid black shapes for clear 1-bit display visibility.
+    Advanced color isolation using HSV thresholds to completely remove 
+    the topographic background map while keeping only vibrant radar rain cells.
     """
-    print("Processing radar image for high-contrast e-ink rendering...")
+    print("Processing radar image with high-precision color isolation...")
     try:
         if not os.path.exists(image_path):
-            print(f"Error: Target image {image_path} does not exist for processing.")
+            print(f"Error: Target image {image_path} does not exist.")
             return
 
         img = Image.open(image_path).convert("RGB")
         pixels = img.load()
         width, height = img.size
 
-        # Construct a pure white frame asset
+        # Create a clean white canvas
         new_img = Image.new("RGB", (width, height), (255, 255, 255))
         new_pixels = new_img.load()
 
@@ -29,31 +29,39 @@ def process_radar_image(image_path):
             for x in range(width):
                 r, g, b = pixels[x, y]
 
-                # Isolate high-saturation radar elements (vibrant blues, greens, yellows, reds)
-                max_val = max(r, g, b)
-                min_val = min(r, g, b)
-                delta = max_val - min_val
-                
-                # Filter rule: Actual weather overlays are vibrant (high delta)
-                is_rain_cell = (delta > 22) and (max_val > 45)
+                # Convert RGB to HSV algorithmically
+                r_n, g_n, b_n = r / 255.0, g / 255.0, b / 255.0
+                max_c = max(r_n, g_n, b_n)
+                min_c = min(r_n, g_n, b_n)
+                diff = max_c - min_c
+
+                s = (diff / max_c) if max_c != 0 else 0
+                v = max_c
+
+                # Filter rule: True weather cells are highly saturated neon colors (S > 0.55)
+                is_rain = (s > 0.55) and (v > 0.45)
 
                 # Catch fallback values for deeper red convective cores
-                if r > 120 and g < 60 and b < 60:
-                    is_rain_cell = True
+                if r > 140 and g < 40 and b < 80:
+                    is_rain = True
+                    
+                # Skip the bottom-right legend box area to keep layout clean
+                if x > (width - 250) and y > (height - 60):
+                    is_rain = False
 
-                if is_rain_cell:
-                    new_pixels[x, y] = (0, 0, 0) # Render precipitation as solid black
+                if is_rain:
+                    new_pixels[x, y] = (0, 0, 0)      # Solid black for rain
                 else:
-                    new_pixels[x, y] = (255, 255, 255) # Wipe the terrain out to pure white
+                    new_pixels[x, y] = (255, 255, 255)  # Pure white background
 
         new_img.save(image_path, "PNG")
-        print("Success: High-contrast map override written.")
+        print("Success: High-contrast rain cells isolated perfectly.")
     except Exception as e:
         print(f"Error during image optimization: {e}")
 
 def main():
     headers = {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
 
     radar_time_human = "Unknown"
@@ -93,14 +101,14 @@ def main():
                         f.write(img_resp.content)
                     print(f"Verified Radar Map downloaded: {latest_filename}")
                     
-                    # Process image modifications
+                    # Run clean HSV image isolation filter
                     process_radar_image(local_image_filename)
                     
     except Exception as e:
         print(f"Radar tracking failed: {e}")
 
     # ==========================================
-    # 2. SCRAPE 7-DAY FORECAST WITH ROBUST FALLBACKS
+    # 2. RUN LIVE 7-DAY FORECAST MATRIX PROCESSING
     # ==========================================
     weather_data = {
         "metadata": {
@@ -113,57 +121,31 @@ def main():
     }
     
     try:
-        mobile_url = "https://m.met.hu/idojaras/telepules/budapest"
-        print(f"Scraping official forecast from: {mobile_url}")
-        page_resp = requests.get(mobile_url, headers=headers, timeout=15)
+        print("Querying multi-day forecast grid variables for Budapest Central Coordinates...")
+        api_url = "https://api.open-meteo.com/v1/forecast?latitude=47.4979&longitude=19.0402&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code&timezone=Europe/Budapest"
         
-        if page_resp.status_code == 200:
-            page_resp.encoding = 'utf-8'
-            soup = BeautifulSoup(page_resp.text, 'html.parser')
+        response = requests.get(api_url, timeout=15)
+        if response.status_code == 200:
+            payload = response.json()
+            daily = payload.get("daily", {})
             
-            # Flexible collection logic: catch block containers or standard tables
-            forecast_blocks = soup.find_all('div', class_=re.compile(r'elorejelzes|nap|box')) or soup.find_all('tr')
-            
-            for index, block in enumerate(forecast_blocks[:7]):
-                text_content = block.text.strip().replace('\n', ' ')
-                # Look for something that looks like temperature limits "24 / 14" or "25°C"
-                temp_match = re.search(r'(\d+)\s*/\s*(\d+)', text_content)
-                
-                if temp_match:
-                    tmax, tmin = temp_match.groups()
-                    date_label = f"Day {index + 1}"
-                    
-                    header_el = block.find(['div', 'span', 'th'], class_=re.compile(r'fejlec|datum|nap'))
-                    if header_el:
-                        date_label = header_el.text.strip()
-
-                    day_entry = {
-                        "date_label": date_label,
-                        "temp_max": f"{tmax}°C",
-                        "temp_min": f"{tmin}°C",
-                        "cloud_icon_index": "1", # Default fallback icon placeholder
-                        "precipitation_mm": "0 mm",
-                        "wind_speed_max": "N/A"
-                    }
-                    weather_data["budapest_forecast"].append(day_entry)
-                    
-            # Double check fallback if list didn't capture clean matrix
-            if not weather_data["budapest_forecast"]:
-                print("Using algorithmic fallback mapping array...")
-                for i in range(1, 6):
-                    weather_data["budapest_forecast"].append({
-                        "date_label": f"Day +{i}",
-                        "temp_max": "26°C",
-                        "temp_min": "15°C",
-                        "cloud_icon_index": "2",
-                        "precipitation_mm": "0 mm",
-                        "wind_speed_max": "N/A"
-                    })
-                
-            print(f"Successfully compiled {len(weather_data['budapest_forecast'])} forecast points.")
+            # Map structural arrays cleanly into your schema blocks
+            for i in range(len(daily.get("time", []))):
+                day_entry = {
+                    "date_label": daily["time"][i],
+                    "temp_max": f"{round(daily['temperature_2m_max'][i])}°C",
+                    "temp_min": f"{round(daily['temperature_2m_min'][i])}°C",
+                    "wind_speed_max": f"{round(daily['wind_speed_10m_max'][i])} km/h",
+                    "cloud_icon_index": str(daily["weather_code"][i]),
+                    "precipitation_mm": f"{daily['precipitation_sum'][i]} mm"
+                }
+                weather_data["budapest_forecast"].append(day_entry)
+            print(f"Successfully compiled {len(weather_data['budapest_forecast'])} forecast entries.")
+        else:
+            print(f"API route returned status: {response.status_code}")
             
     except Exception as e:
-        print(f"Failed parsing mobile layout cleanly: {e}")
+        print(f"Failed pulling clean forecast schema: {e}")
 
     # ==========================================
     # 3. EXPORT NATIVE JSON ASSET
