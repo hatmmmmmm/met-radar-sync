@@ -1,8 +1,9 @@
 <?xml version="1.0" ?>
 <trmnl_data>
   <metadata>
-    <fetched_at_epoch>1783529544</fetched_at_epoch>
-    <fetched_at_human>2026-07-08 16:52:25</fetched_at_human>
+    <fetched_at_epoch>1783530556</fetched_at_epoch>
+    <fetched_at_human>2026-07-08 17:09:16</fetched_at_human>
+    <radar_observed_time>Unknown</radar_observed_time>
   </metadata>
   <budapest_current>
     <temperature>N/A</temperature>
