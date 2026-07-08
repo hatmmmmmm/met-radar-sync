@@ -22,15 +22,16 @@ jobs:
     - name: Checkout repository code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 1 # Pulls only the latest snapshot to keep the workspace lightweight
+        fetch-depth: 1
 
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
+    # --- THIS IS THE CRITICAL DEPENDENCY UPDATE BLOCK ---
     - name: Install dependencies
-      run: pip install requests beautifulsoup4
+      run: pip install requests beautifulsoup4 pillow
 
     - name: Run the updater script
       run: python update_radar.py
@@ -40,14 +41,12 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
         
-        # Stage the image asset and the new JSON data file
+        # Track both the optimized high-contrast image and the scraped data
         git add latest_radar.png weather_data.json
         
-        # Only commit if the data or image actually changed visually
         if git diff-index --quiet HEAD --; then
-          echo "No visual changes in radar data or JSON. Skipping commit."
+          echo "No changes detected. Skipping commit."
         else
-          git commit -m "Forced update of weather assets and JSON payload from ODP"
-          # Force push to cleanly overwrite any history divergence errors
+          git commit -m "Updated high-contrast weather radar and forecast metrics"
           git push origin HEAD:main --force
         fi
