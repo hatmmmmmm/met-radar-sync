@@ -1,57 +1,116 @@
 import os
+import time
 import requests
+import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
+from xml.dom import minidom
+
+def clean_xml_string(element):
+    """Returns a pretty-printed XML string for TRMNL parsing."""
+    rough_string = ET.tostring(element, 'utf-8')
+    reparsed = minidom.parseString(rough_string)
+    return reparsed.toprettyxml(indent="  ")
 
 def main():
-    # Target the clean mobile layout
-    url = "https://m.met.hu/radar"
-    
-    # These headers disguise the GitHub Action script as a real Google Chrome browser on Android
+    session = requests.Session()
     headers = {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Referer": "https://m.met.hu/"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://www.met.hu/"
     }
     
-    # 1. Fetch the mobile webpage cleanly
-    session = requests.Session()
-    response = session.get(url, headers=headers, timeout=15)
+    # ---------------------------------------------------------
+    # 1. DOWNLOAD THE FULL-SIZE MAIN RADAR ASSET
+    # ---------------------------------------------------------
+    radar_base_url = "https://www.met.hu/img/radar/rccmax.idoido.png"
+    timestamp = int(time.time())
+    radar_url = f"{radar_base_url}?t={timestamp}"
     
-    if response.status_code != 200:
-        print(f"HungaroMet blocked access. Status Code: {response.status_code}")
-        return
+    print(f"Fetching full-size desktop radar image from: {radar_url}")
+    try:
+        img_response = session.get(radar_url, headers=headers, timeout=15)
+        if img_response.status_code == 200:
+            with open("latest_radar.png", "wb") as f:
+                f.write(img_response.content)
+            print("Successfully saved full-size latest_radar.png")
+        else:
+            print(f"Failed to fetch radar image asset: {img_response.status_code}")
+    except Exception as e:
+        print(f"Error fetching radar image: {e}")
 
-    # 2. Extract the active radar frame link
-    soup = BeautifulSoup(response.text, 'html.parser')
-    img_url = None
+    # ---------------------------------------------------------
+    # 2. SCRAPE BUDAPEST WEATHER AND COMPILE THE XML DATA
+    # ---------------------------------------------------------
+    weather_url = "https://www.met.hu/idojaras/"
+    print(f"Scraping current data and forecasts from: {weather_url}")
     
-    # Search for the image element that serves the current radar loop frame
-    for img in soup.find_all('img'):
-        src = img.get('src', '')
-        if 'rccmax' in src or 'radar' in src or 'idoido' in src:
-            img_url = src
-            break
-
-    if not img_url:
-        print("Page loaded successfully, but the image element layout could not be found.")
-        return
-
-    # Handle relative links if necessary
-    if not img_url.startswith("http"):
-        img_url = "https://m.met.hu" + img_url
-
-    # 3. Download the actual image payload bytes
-    print(f"Downloading active image asset from: {img_url}")
-    img_response = session.get(img_url, headers=headers, timeout=15)
+    root_xml = ET.Element("trmnl_data")
     
-    if img_response.status_code == 200:
-        # 4. Save/Overwrite the permanent file target for TRMNL
-        with open("latest_radar.png", "wb") as f:
-            f.write(img_response.content)
-        print("Success! latest_radar.png file generated and verified.")
-    else:
-        print(f"Failed downloading raw image asset bytes: {img_response.status_code}")
+    # Track metadata stamp of the fetch execution
+    meta_xml = ET.SubElement(root_xml, "metadata")
+    ET.SubElement(meta_xml, "fetched_at_epoch").text = str(timestamp)
+    ET.SubElement(meta_xml, "fetched_at_human").text = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+
+    try:
+        response = session.get(weather_url, headers=headers, timeout=15)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Target the current Budapest data panel block
+            bp_xml = ET.SubElement(root_xml, "budapest_current")
+            
+            # Find the element showing current temperature in Budapest
+            # The desktop portal groups actual strings inside an identifiable grid or marquee class
+            bp_temp = None
+            bp_cond = "N/A"
+            
+            for item in soup.find_all(text=True):
+                if "Budapest" in item:
+                    # Look globally around parent containers for text siblings matching degrees Celsius
+                    parent_text = item.parent.get_text() if item.parent else ""
+                    if "°C" in parent_text:
+                        # Extract the condition text block strings cleanly
+                        parts = [p.strip() for p in parent_text.split("·") if p.strip()]
+                        for part in parts:
+                            if "Budapest" in part:
+                                bp_cond = part.replace("Budapest", "").strip()
+                            if "°C" in part:
+                                bp_temp = part.strip()
+                        break
+
+            ET.SubElement(bp_xml, "temperature").text = bp_temp if bp_temp else "N/A"
+            ET.SubElement(bp_xml, "condition").text = bp_cond
+
+            # Extract the 7-day text preview matrix rows
+            forecast_xml = ET.SubElement(root_xml, "forecasts")
+            forecast_box = soup.find("div", class_="vv-forecast-box") or soup.find("div", id="content")
+            
+            if forecast_box:
+                # Loop through days parsed out of the main grid blocks
+                days_found = 0
+                for text_node in soup.find_all(text=True):
+                    if "2026." in text_node and "°C" in text_node.parent.get_text():
+                        full_row = text_node.parent.get_text().strip()
+                        # Sanitize whitespace blobs down to single separators
+                        clean_row = " ".join(full_row.split())
+                        
+                        day_item = ET.SubElement(forecast_xml, "day")
+                        day_item.set("index", str(days_found))
+                        ET.SubElement(day_item, "raw_data").text = clean_row
+                        days_found += 1
+                        if days_found >= 5: # Limit tree growth down to next 5 days max
+                            break
+                            
+            print("Successfully processed weather dataset.")
+        else:
+            print(f"Could not load weather portal page payload: {response.status_code}")
+    except Exception as e:
+        print(f"Error compiling scraping node sequences: {e}")
+
+    # Save out structured layout document directly into workspace root
+    xml_output = clean_xml_string(root_xml)
+    with open("weather_data.xml", "w", encoding="utf-8") as xml_file:
+        xml_file.write(xml_output)
+    print("Success! weather_data.xml file output complete.")
 
 if __name__ == "__main__":
     main()
