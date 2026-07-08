@@ -1,9 +1,50 @@
 {
   "metadata": {
-    "fetched_at_epoch": 1783540471,
-    "fetched_at_human": "2026-07-08 19:54:31",
-    "radar_observed_time": "2026-07-08 19:45 UTC",
+    "fetched_at_epoch": 1783540678,
+    "fetched_at_human": "2026-07-08 19:57:58",
+    "radar_observed_time": "2026-07-08 19:50 UTC",
     "radar_image_file": "https://raw.githubusercontent.com/hatmmmmmm/met-radar-sync/main/latest_radar.png"
   },
-  "budapest_forecast": []
+  "budapest_forecast": [
+    {
+      "date_label": "Day +1",
+      "temp_max": "26°C",
+      "temp_min": "15°C",
+      "cloud_icon_index": "2",
+      "precipitation_mm": "0 mm",
+      "wind_speed_max": "N/A"
+    },
+    {
+      "date_label": "Day +2",
+      "temp_max": "26°C",
+      "temp_min": "15°C",
+      "cloud_icon_index": "2",
+      "precipitation_mm": "0 mm",
+      "wind_speed_max": "N/A"
+    },
+    {
+      "date_label": "Day +3",
+      "temp_max": "26°C",
+      "temp_min": "15°C",
+      "cloud_icon_index": "2",
+      "precipitation_mm": "0 mm",
+      "wind_speed_max": "N/A"
+    },
+    {
+      "date_label": "Day +4",
+      "temp_max": "26°C",
+      "temp_min": "15°C",
+      "cloud_icon_index": "2",
+      "precipitation_mm": "0 mm",
+      "wind_speed_max": "N/A"
+    },
+    {
+      "date_label": "Day +5",
+      "temp_max": "26°C",
+      "temp_min": "15°C",
+      "cloud_icon_index": "2",
+      "precipitation_mm": "0 mm",
+      "wind_speed_max": "N/A"
+    }
+  ]
 }
