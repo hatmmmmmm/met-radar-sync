@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 
 def main():
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
     }
 
     radar_time_human = "Unknown"
@@ -50,7 +50,7 @@ def main():
         print(f"Radar tracking failed: {e}")
 
     # ==========================================
-    # 2. PARSE THE 7-DAY GRID DATA INTO JSON
+    # 2. SCRAPE 7-DAY FORECAST FROM MET.HU MOBILE
     # ==========================================
     weather_data = {
         "metadata": {
@@ -63,61 +63,60 @@ def main():
     }
     
     try:
-        odp_focus_url = "https://odp.met.hu/weather/nwp/FOCUS/focus.json"
-        print("Reading ODP FOCUS structural forecast metrics...")
-        focus_data = requests.get(odp_focus_url, headers=headers, timeout=15).json()
+        mobile_url = "https://m.met.hu/idojaras/telepules/budapest"
+        print(f"Scraping official forecast from: {mobile_url}")
+        page_resp = requests.get(mobile_url, headers=headers, timeout=15)
         
-        # Look for Budapest data dynamically (checking common case variations)
-        bp_forecast = None
-        for key in ["Budapest", "budapest", "BUDAPEST", "12843"]: # 12843 is Budapest's OMSZ/HungaroMet block station code
-            if key in focus_data:
-                bp_forecast = focus_data[key]
-                print(f"Successfully matched Budapest data layout using key: '{key}'")
-                break
-        
-        # Fallback: If it's a flat date-first array dictionary
-        if bp_forecast is None:
-            first_key = next(iter(focus_data))
-            if re.match(r"\d{4}-\d{2}-\d{2}", first_key):
-                bp_forecast = focus_data
-                print("Processing global date-sorted forecast grid structure...")
-
-        if bp_forecast:
-            for day_key, day_metrics in sorted(bp_forecast.items()):
-                # Filter out metadata structural nodes, leaving only string dates
-                if not isinstance(day_key, str) or not re.search(r"\d{4}-\d{2}-\d{2}", day_key):
-                    continue
+        if page_resp.status_code == 200:
+            # Fix encoding to correctly display Hungarian accents (é, á, ó, etc.)
+            page_resp.encoding = 'utf-8'
+            soup = BeautifulSoup(page_resp.text, 'html.parser')
+            
+            # Target the block elements containing each day's values
+            forecast_blocks = soup.find_all('div', class_='elorejelzes-nap')
+            
+            for block in forecast_blocks:
+                # 1. Get Day / Date Header
+                date_el = block.find('div', class_='nap-fejlec')
+                date_label = date_el.text.strip() if date_el else "N/A"
                 
-                # Extract properties safely with fallback indicators
-                tmax = day_metrics.get('Tmax') or day_metrics.get('tmax') or day_metrics.get('T2max', 'N/A')
-                tmin = day_metrics.get('Tmin') or day_metrics.get('tmin') or day_metrics.get('T2min', 'N/A')
-                wmax = day_metrics.get('Wmax') or day_metrics.get('wmax') or day_metrics.get('WSpeedMax', 'N/A')
-                wavg = day_metrics.get('Wavg') or day_metrics.get('wavg') or day_metrics.get('WSpeedAvg', 'N/A')
-                wdir = day_metrics.get('Wdir') or day_metrics.get('wdir') or day_metrics.get('WDir10', 'N/A')
-                icon = day_metrics.get('weather_type') or day_metrics.get('icon') or day_metrics.get('Fx', 'N/A')
-                prec = day_metrics.get('Precip') or day_metrics.get('precip') or day_metrics.get('P24', '0')
+                # 2. Get Max/Min Temperatures
+                temp_el = block.find('div', class_='nap-homerseklet')
+                temp_text = temp_el.text.strip() if temp_el else "N/A / N/A"
+                # Splits "28°C / 16°C" safely into individual pieces
+                temps = [t.strip() for t in temp_text.split('/')]
+                tmax = temps[0] if len(temps) > 0 else "N/A"
+                tmin = temps[1] if len(temps) > 1 else "N/A"
+                
+                # 3. Get Weather Condition Text & Icon Index
+                cond_img = block.find('img', class_='nap-ikon')
+                icon_idx = "N/A"
+                if cond_img and cond_img.get('src'):
+                    # Extracts filename '1.png' -> '1'
+                    icon_idx = cond_img.get('src').split('/')[-1].replace('.png', '')
+                
+                # 4. Get Precipitation Data if listed
+                precip_el = block.find('div', class_='nap-csapadek')
+                precip = precip_el.text.strip() if precip_el else "0 mm"
+
+                # 5. Get Wind details if listed
+                wind_el = block.find('div', class_='nap-szel')
+                wind = wind_el.text.strip() if wind_el else "N/A"
 
                 day_entry = {
-                    "date_label": day_key,
-                    "temp_max": f"{tmax}°C" if "°C" not in str(tmax) and tmax != 'N/A' else str(tmax),
-                    "temp_min": f"{tmin}°C" if "°C" not in str(tmin) and tmin != 'N/A' else str(tmin),
-                    "wind_speed_max": f"{wmax} km/h" if "km/h" not in str(wmax) and wmax != 'N/A' else str(wmax),
-                    "wind_speed_avg": f"{wavg} km/h" if "km/h" not in str(wavg) and wavg != 'N/A' else str(wavg),
-                    "wind_direction": str(wdir),
-                    "cloud_icon_index": str(icon),
-                    "precipitation_mm": f"{prec} mm" if "mm" not in str(prec) else str(prec)
+                    "date_label": date_label,
+                    "temp_max": tmax,
+                    "temp_min": tmin,
+                    "cloud_icon_index": icon_idx,
+                    "precipitation_mm": precip,
+                    "wind_speed_max": wind
                 }
                 weather_data["budapest_forecast"].append(day_entry)
-        else:
-            # Absolute fallback: loop through and find nested Budapest strings safely
-            print("Layout mismatched. Attempting secondary structural parsing query...")
-            for main_key, nested_val in focus_data.items():
-                if isinstance(nested_val, dict) and "Budapest" in str(nested_val.keys()):
-                    bp_forecast = nested_val.get("Budapest")
-                    # process subelements loop...
-                    
+                
+            print(f"Successfully processed {len(weather_data['budapest_forecast'])} forecast days.")
+            
     except Exception as e:
-        print(f"Failed parsing numerical forecast grid: {e}")
+        print(f"Failed parsing mobile layout: {e}")
 
     # ==========================================
     # 3. EXPORT NATIVE JSON ASSET
