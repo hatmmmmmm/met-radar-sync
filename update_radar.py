@@ -50,9 +50,8 @@ def main():
         print(f"Radar tracking failed: {e}")
 
     # ==========================================
-    # 2. PARSE THE 7-DAY GRID DATA INTO JSON
+    # 2. PARSE 7-DAY BUDAPEST FORECAST FROM WEB
     # ==========================================
-    # Constructing a clean, primitive dictionary layer
     weather_data = {
         "metadata": {
             "fetched_at_epoch": int(time.time()),
@@ -62,34 +61,45 @@ def main():
         },
         "budapest_forecast": []
     }
-    
+
     try:
-        odp_focus_url = "https://odp.met.hu/weather/nwp/FOCUS/focus.json"
-        print("Reading ODP FOCUS structural forecast metrics...")
-        focus_data = requests.get(odp_focus_url, headers=headers, timeout=15).json()
+        print("Parsing live 7-day operational forecast matrix...")
+        # Target the main weather page for Budapest
+        forecast_url = "https://www.met.hu/idojaras/elorejelzes/magyarorszagi_telepulesek/details.php?id=Budapest"
+        page_resp = requests.get(forecast_url, headers=headers, timeout=15)
         
-        if "Budapest" in focus_data:
-            bp_forecast = focus_data["Budapest"]
+        if page_resp.status_code == 200:
+            soup = BeautifulSoup(page_resp.text, 'html.parser')
             
-            for day_key, day_metrics in sorted(bp_forecast.items()):
-                if not re.match(r"\d{4}-\d{2}-\d{2}", day_key):
-                    continue
+            # Find the main container for the daily forecast blocks
+            forecast_container = soup.find('div', class_='elorejelzes-telepules-napok')
+            if forecast_container:
+                days = forecast_container.find_all('div', class_='nap')
                 
-                day_entry = {
-                    "date_label": day_key,
-                    "temp_max": f"{day_metrics.get('Tmax', 'N/A')}°C",
-                    "temp_min": f"{day_metrics.get('Tmin', 'N/A')}°C",
-                    "wind_speed_max": f"{day_metrics.get('Wmax', 'N/A')} km/h",
-                    "wind_speed_avg": f"{day_metrics.get('Wavg', 'N/A')} km/h",
-                    "wind_direction": str(day_metrics.get("Wdir", "N/A")),
-                    "cloud_icon_index": str(day_metrics.get("weather_type", "N/A")),
-                    "precipitation_mm": f"{day_metrics.get('Precip', '0')} mm"
-                }
-                weather_data["budapest_forecast"].append(day_entry)
-        else:
-            print("Budapest segment was not found in focus.json file.")
+                for day in days:
+                    # Extract date, max/min temps, wind, and precipitation values
+                    date_label = day.find('span', class_='datum').text.strip() if day.find('span', class_='datum') else "N/A"
+                    tmax = day.find('span', class_='tmax').text.strip() if day.find('span', class_='tmax') else "N/A"
+                    tmin = day.find('span', class_='tmin').text.strip() if day.find('span', class_='tmin') else "N/A"
+                    
+                    # Target icon names to determine the cloud/weather status index
+                    img_tag = day.find('img', class_='idokep')
+                    icon_idx = img_tag.get('src', '').split('/')[-1].replace('.png', '') if img_tag else "N/A"
+                    
+                    day_entry = {
+                        "date_label": date_label,
+                        "temp_max": tmax,
+                        "temp_min": tmin,
+                        "cloud_icon_index": icon_idx,
+                        # Web values fall back to defaults if detailed metrics are deep-linked
+                        "wind_speed_max": "N/A", 
+                        "precipitation_mm": "N/A"
+                    }
+                    weather_data["budapest_forecast"].append(day_entry)
+            else:
+                print("Could not locate the operational table container on the web page structure.")
     except Exception as e:
-        print(f"Failed parsing numerical forecast grid: {e}")
+        print(f"Failed parsing operational forecast grid: {e}")
 
     # ==========================================
     # 3. EXPORT NATIVE JSON ASSET
