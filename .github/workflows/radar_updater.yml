@@ -20,7 +20,7 @@ jobs:
     - name: Checkout repository code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 1 # Pulls only the latest snapshot to keep the workspace clean
+        fetch-depth: 1
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -33,22 +33,16 @@ jobs:
     - name: Run the updater script
       run: python update_radar.py
 
-    # =========================================================================
-    # THIS ENTIRE STEP REPLACES THE BLOCKED STEFANZWEIFEL PLUGIN COMPLETELY
-    # =========================================================================
     - name: Force Commit and Push Changes via Native Git
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
         
-        # Stage the generated assets safely
         git add latest_radar.png weather_data.xml
         
-        # Only commit if the files have actual data changes
         if git diff-index --quiet HEAD --; then
           echo "No visual changes in radar data or XML. Skipping commit."
         else
           git commit -m "Forced update of weather assets and XML payload from ODP"
-          # This native force command breaks straight through any branch divergence
           git push origin HEAD:main --force
         fi
