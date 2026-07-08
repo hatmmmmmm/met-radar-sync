@@ -7,8 +7,6 @@ on:
 
     # 2. EVENING PHASE: Run every 15 minutes between 17:00 and 22:59 Hungarian Local Time (15:00 to 20:59 UTC)
     - cron: '*/15 15-20 * * *'
-    
-    # 3. NIGHTTIME / QUIET PHASE: 23:00 to 05:00 Local (21:00 to 03:00 UTC) is skipped entirely.
 
   workflow_dispatch:
 
@@ -35,19 +33,22 @@ jobs:
     - name: Run the updater script
       run: python update_radar.py
 
-    - name: Force Commit and Push Changes
+    # =========================================================================
+    # THIS ENTIRE STEP REPLACES THE BLOCKED STEFANZWEIFEL PLUGIN COMPLETELY
+    # =========================================================================
+    - name: Force Commit and Push Changes via Native Git
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
         
-        # Stage the generated assets
+        # Stage the generated assets safely
         git add latest_radar.png weather_data.xml
         
-        # Only commit if the files have actually changed
+        # Only commit if the files have actual data changes
         if git diff-index --quiet HEAD --; then
-          print "No visual changes in radar data or XML. Skipping commit."
+          echo "No visual changes in radar data or XML. Skipping commit."
         else
           git commit -m "Forced update of weather assets and XML payload from ODP"
-          # Force push to cleanly overwrite any history divergence errors
+          # This native force command breaks straight through any branch divergence
           git push origin HEAD:main --force
         fi
