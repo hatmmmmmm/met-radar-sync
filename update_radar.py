@@ -50,7 +50,7 @@ def main():
         print(f"Radar tracking failed: {e}")
 
     # ==========================================
-    # 2. PARSE 7-DAY BUDAPEST FORECAST FROM WEB
+    # 2. PARSE THE 7-DAY GRID DATA INTO JSON
     # ==========================================
     weather_data = {
         "metadata": {
@@ -61,45 +61,63 @@ def main():
         },
         "budapest_forecast": []
     }
-
+    
     try:
-        print("Parsing live 7-day operational forecast matrix...")
-        # Target the main weather page for Budapest
-        forecast_url = "https://www.met.hu/idojaras/elorejelzes/magyarorszagi_telepulesek/details.php?id=Budapest"
-        page_resp = requests.get(forecast_url, headers=headers, timeout=15)
+        odp_focus_url = "https://odp.met.hu/weather/nwp/FOCUS/focus.json"
+        print("Reading ODP FOCUS structural forecast metrics...")
+        focus_data = requests.get(odp_focus_url, headers=headers, timeout=15).json()
         
-        if page_resp.status_code == 200:
-            soup = BeautifulSoup(page_resp.text, 'html.parser')
-            
-            # Find the main container for the daily forecast blocks
-            forecast_container = soup.find('div', class_='elorejelzes-telepules-napok')
-            if forecast_container:
-                days = forecast_container.find_all('div', class_='nap')
+        # Look for Budapest data dynamically (checking common case variations)
+        bp_forecast = None
+        for key in ["Budapest", "budapest", "BUDAPEST", "12843"]: # 12843 is Budapest's OMSZ/HungaroMet block station code
+            if key in focus_data:
+                bp_forecast = focus_data[key]
+                print(f"Successfully matched Budapest data layout using key: '{key}'")
+                break
+        
+        # Fallback: If it's a flat date-first array dictionary
+        if bp_forecast is None:
+            first_key = next(iter(focus_data))
+            if re.match(r"\d{4}-\d{2}-\d{2}", first_key):
+                bp_forecast = focus_data
+                print("Processing global date-sorted forecast grid structure...")
+
+        if bp_forecast:
+            for day_key, day_metrics in sorted(bp_forecast.items()):
+                # Filter out metadata structural nodes, leaving only string dates
+                if not isinstance(day_key, str) or not re.search(r"\d{4}-\d{2}-\d{2}", day_key):
+                    continue
                 
-                for day in days:
-                    # Extract date, max/min temps, wind, and precipitation values
-                    date_label = day.find('span', class_='datum').text.strip() if day.find('span', class_='datum') else "N/A"
-                    tmax = day.find('span', class_='tmax').text.strip() if day.find('span', class_='tmax') else "N/A"
-                    tmin = day.find('span', class_='tmin').text.strip() if day.find('span', class_='tmin') else "N/A"
+                # Extract properties safely with fallback indicators
+                tmax = day_metrics.get('Tmax') or day_metrics.get('tmax') or day_metrics.get('T2max', 'N/A')
+                tmin = day_metrics.get('Tmin') or day_metrics.get('tmin') or day_metrics.get('T2min', 'N/A')
+                wmax = day_metrics.get('Wmax') or day_metrics.get('wmax') or day_metrics.get('WSpeedMax', 'N/A')
+                wavg = day_metrics.get('Wavg') or day_metrics.get('wavg') or day_metrics.get('WSpeedAvg', 'N/A')
+                wdir = day_metrics.get('Wdir') or day_metrics.get('wdir') or day_metrics.get('WDir10', 'N/A')
+                icon = day_metrics.get('weather_type') or day_metrics.get('icon') or day_metrics.get('Fx', 'N/A')
+                prec = day_metrics.get('Precip') or day_metrics.get('precip') or day_metrics.get('P24', '0')
+
+                day_entry = {
+                    "date_label": day_key,
+                    "temp_max": f"{tmax}°C" if "°C" not in str(tmax) and tmax != 'N/A' else str(tmax),
+                    "temp_min": f"{tmin}°C" if "°C" not in str(tmin) and tmin != 'N/A' else str(tmin),
+                    "wind_speed_max": f"{wmax} km/h" if "km/h" not in str(wmax) and wmax != 'N/A' else str(wmax),
+                    "wind_speed_avg": f"{wavg} km/h" if "km/h" not in str(wavg) and wavg != 'N/A' else str(wavg),
+                    "wind_direction": str(wdir),
+                    "cloud_icon_index": str(icon),
+                    "precipitation_mm": f"{prec} mm" if "mm" not in str(prec) else str(prec)
+                }
+                weather_data["budapest_forecast"].append(day_entry)
+        else:
+            # Absolute fallback: loop through and find nested Budapest strings safely
+            print("Layout mismatched. Attempting secondary structural parsing query...")
+            for main_key, nested_val in focus_data.items():
+                if isinstance(nested_val, dict) and "Budapest" in str(nested_val.keys()):
+                    bp_forecast = nested_val.get("Budapest")
+                    # process subelements loop...
                     
-                    # Target icon names to determine the cloud/weather status index
-                    img_tag = day.find('img', class_='idokep')
-                    icon_idx = img_tag.get('src', '').split('/')[-1].replace('.png', '') if img_tag else "N/A"
-                    
-                    day_entry = {
-                        "date_label": date_label,
-                        "temp_max": tmax,
-                        "temp_min": tmin,
-                        "cloud_icon_index": icon_idx,
-                        # Web values fall back to defaults if detailed metrics are deep-linked
-                        "wind_speed_max": "N/A", 
-                        "precipitation_mm": "N/A"
-                    }
-                    weather_data["budapest_forecast"].append(day_entry)
-            else:
-                print("Could not locate the operational table container on the web page structure.")
     except Exception as e:
-        print(f"Failed parsing operational forecast grid: {e}")
+        print(f"Failed parsing numerical forecast grid: {e}")
 
     # ==========================================
     # 3. EXPORT NATIVE JSON ASSET
