@@ -28,8 +28,8 @@ jobs:
       run: python update_radar.py
 
     # This pattern now checks for updates across both files safely
-    - name: Auto-Commit and Push Files
+    - name: Auto-Commit and Push File
       uses: stefanzweifel/git-auto-commit-action@v5
       with:
-        commit_message: "Update radar assets and XML data feeds"
+        commit_message: "Forced update of weather assets"
         file_pattern: 'latest_radar.png weather_data.xml'
