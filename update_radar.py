@@ -8,49 +8,46 @@ from PIL import Image
 
 def process_radar_image(image_path):
     """
-    Filters out the background terrain map and increases contrast
-    to make the rain radar cells pop beautifully on a 1-bit e-ink screen.
+    Strips away the background geography map and converts any 
+    precipitation metrics into solid black shapes for clear 1-bit display visibility.
     """
-    print("Processing radar image for high-contrast 1-bit optimization...")
+    print("Processing radar image for high-contrast e-ink rendering...")
     try:
-        # Open the downloaded radar image and ensure it's in RGBA mode
-        img = Image.open(image_path).convert("RGBA")
+        # Open and ensure target is in a true 24-bit RGB space
+        img = Image.open(image_path).convert("RGB")
         pixels = img.load()
         width, height = img.size
 
-        # Create a brand new, pure white background image of the same size
-        new_img = Image.new("RGBA", (width, height), (255, 255, 255, 255))
+        # Construct a pure white frame asset
+        new_img = Image.new("RGB", (width, height), (255, 255, 255))
         new_pixels = new_img.load()
 
         for y in range(height):
             for x in range(width):
-                r, g, b, a = pixels[x, y]
+                r, g, b = pixels[x, y]
 
-                # Calculate standard brightness (V) and a simple saturation indicator
+                # Isolate high-saturation radar elements (vibrant blues, greens, yellows, reds)
+                # Terrain and map markings have low variations between R, G, and B lines
                 max_val = max(r, g, b)
                 min_val = min(r, g, b)
                 delta = max_val - min_val
                 
-                # Saturated, vibrant colors are radar returns (blues, greens, reds, yellows)
-                # Muted colors with low delta are the terrain map background
-                is_radar_color = (delta > 35) and (max_val > 40)
+                # Filter rule: Actual weather overlays are vibrant (high delta)
+                is_rain_cell = (delta > 25) and (max_val > 45)
 
-                # Special check to catch the intense red/magenta cores
-                if r > 150 and g < 50:
-                    is_radar_color = True
+                # Catch fallback values for deeper red convective cores
+                if r > 130 and g < 60 and b < 60:
+                    is_rain_cell = True
 
-                if is_radar_color:
-                    # It's rain! Make it pure, solid black for maximum visibility
-                    new_pixels[x, y] = (0, 0, 0, 255)
+                if is_rain_cell:
+                    new_pixels[x, y] = (0, 0, 0) # Render precipitation as solid black
                 else:
-                    # It's background terrain or text borders. Turn it white.
-                    new_pixels[x, y] = (255, 255, 255, 255)
+                    new_pixels[x, y] = (255, 255, 255) # Wipe the terrain out to pure white
 
-        # Save the high-contrast image back over the old filename
         new_img.save(image_path, "PNG")
-        print("Image processing complete. Terrain removed successfully.")
+        print("Success: High-contrast map override written.")
     except Exception as e:
-        print(f"Failed to process image layers: {e}")
+        print(f"Error during image optimization layer manipulation: {e}")
 
 def main():
     headers = {
@@ -78,7 +75,8 @@ def main():
                          if link.get('href', '').startswith("radar_composite-refl2D-") and link.get('href', '').endswith(".png")]
             
             if png_links:
-                latest_filename = sorted(png_links)[[-1]]
+                # FIXED: Corrected single index array selector syntax error
+                latest_filename = sorted(png_links)[-1]
                 target_image_url = odp_radar_dir + latest_filename
                 
                 time_match = re.search(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})", latest_filename)
@@ -94,7 +92,7 @@ def main():
                         f.write(img_resp.content)
                     print(f"Verified Radar Map pulled: {latest_filename}")
                     
-                    # RUN FILTERING PROCESSING ROUTINE HERE
+                    # Process image modifications
                     process_radar_image(local_image_filename)
                     
     except Exception as e:
@@ -130,8 +128,8 @@ def main():
                 temp_el = block.find('div', class_='nap-homerseklet')
                 temp_text = temp_el.text.strip() if temp_el else "N/A / N/A"
                 temps = [t.strip() for t in temp_text.split('/')]
-                tmax = temps[[0]] if len(temps) > 0 else "N/A"
-                tmin = temps[[1]] if len(temps) > 1 else "N/A"
+                tmax = temps[0] if len(temps) > 0 else "N/A"
+                tmin = temps[1] if len(temps) > 1 else "N/A"
                 
                 cond_img = block.find('img', class_='nap-ikon')
                 icon_idx = "N/A"
