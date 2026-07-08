@@ -2,15 +2,8 @@ name: Fetch Latest Met.hu Radar
 
 on:
   schedule:
-    # 1. DAYTIME PHASE: Run every 60 minutes between 05:00 and 16:59 Local (03:00 to 14:59 UTC)
     - cron: '0 3-14 * * *'
-
-    # 2. EVENING PHASE: Run every 15 minutes between 17:00 and 22:59 Local (15:00 to 20:59 UTC)
     - cron: '*/15 15-20 * * *'
-    
-    # 3. NIGHTTIME / QUIET PHASE: 23:00 to 05:00 Local (21:00 to 03:00 UTC)
-    # Mandated by skipping these hours entirely across both rules above.
-
   workflow_dispatch:
 
 permissions:
@@ -28,18 +21,15 @@ jobs:
       with:
         python-version: '3.10'
 
-    # Automatically install requirements cleanly 
     - name: Install dependencies
       run: pip install requests beautifulsoup4
 
-    # Run the exact code block to download the image bytes
     - name: Run the updater script
       run: python update_radar.py
 
-    # Bypasses Exit Code 128 by routing file pushes through an official pre-authenticated module
-    - name: Auto-Commit and Push File
+    # This pattern now checks for updates across both files safely
+    - name: Auto-Commit and Push Files
       uses: stefanzweifel/git-auto-commit-action@v5
       with:
-        commit_message: "Update radar image to latest"
-        file_pattern: 'latest_radar.png'
-        
+        commit_message: "Update radar assets and XML data feeds"
+        file_pattern: 'latest_radar.png weather_data.xml'
