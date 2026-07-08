@@ -22,7 +22,7 @@ jobs:
     - name: Checkout repository code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 1 # Pulls only the latest commit to prevent tree mismatches
+        fetch-depth: 1 # Pulls only the latest snapshot to keep the workspace clean
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -35,10 +35,19 @@ jobs:
     - name: Run the updater script
       run: python update_radar.py
 
-    - name: Auto-Commit and Push File Changes
-      uses: stefanzweifel/git-auto-commit-action@v5
-      with:
-        commit_message: "Forced update of weather assets and XML payload from ODP"
-        file_pattern: 'latest_radar.png weather_data.xml'
-        commit_options: '--no-verify'
-        push_options: '--force' # Bypasses non-fast-forward push conflicts from parallel schedules
+    - name: Force Commit and Push Changes
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        
+        # Stage the generated assets
+        git add latest_radar.png weather_data.xml
+        
+        # Only commit if the files have actually changed
+        if git diff-index --quiet HEAD --; then
+          print "No visual changes in radar data or XML. Skipping commit."
+        else
+          git commit -m "Forced update of weather assets and XML payload from ODP"
+          # Force push to cleanly overwrite any history divergence errors
+          git push origin HEAD:main --force
+        fi
