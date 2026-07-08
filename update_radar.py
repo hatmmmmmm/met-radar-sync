@@ -1,10 +1,9 @@
 import os
 import re
 import time
+import json
 import requests
 from bs4 import BeautifulSoup
-import xml.etree.ElementTree as ET
-from xml.dom import minidom
 
 def main():
     headers = {
@@ -14,7 +13,7 @@ def main():
     radar_time_human = "Unknown"
     local_image_filename = "latest_radar.png"
     
-    github_user = "hatmmmmmmm"
+    github_user = "hatmmmmmm"
     github_repo = "met-radar-sync"
     public_image_url = f"https://raw.githubusercontent.com/{github_user}/{github_repo}/main/{local_image_filename}"
 
@@ -51,17 +50,18 @@ def main():
         print(f"Radar tracking failed: {e}")
 
     # ==========================================
-    # 2. PARSE THE 7-DAY GRID DATA FROM ODP JSON
+    # 2. PARSE THE 7-DAY GRID DATA INTO JSON
     # ==========================================
-    root = ET.Element("trmnl_data")
-    
-    meta = ET.SubElement(root, "metadata")
-    ET.SubElement(meta, "fetched_at_epoch").text = str(int(time.time()))
-    ET.SubElement(meta, "fetched_at_human").text = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
-    ET.SubElement(meta, "radar_observed_time").text = radar_time_human
-    ET.SubElement(meta, "radar_image_file").text = public_image_url
-
-    forecast_node = ET.SubElement(root, "budapest_forecast")
+    # Constructing a clean, primitive dictionary layer
+    weather_data = {
+        "metadata": {
+            "fetched_at_epoch": int(time.time()),
+            "fetched_at_human": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()),
+            "radar_observed_time": radar_time_human,
+            "radar_image_file": public_image_url
+        },
+        "budapest_forecast": []
+    }
     
     try:
         odp_focus_url = "https://odp.met.hu/weather/nwp/FOCUS/focus.json"
@@ -74,31 +74,29 @@ def main():
             for day_key, day_metrics in sorted(bp_forecast.items()):
                 if not re.match(r"\d{4}-\d{2}-\d{2}", day_key):
                     continue
-                    
-                day_element = ET.SubElement(forecast_node, "day", date=day_key)
                 
-                ET.SubElement(day_element, "temp_max").text = f"{day_metrics.get('Tmax', 'N/A')}°C"
-                ET.SubElement(day_element, "temp_min").text = f"{day_metrics.get('Tmin', 'N/A')}°C"
-                ET.SubElement(day_element, "wind_speed_max").text = f"{day_metrics.get('Wmax', 'N/A')} km/h"
-                ET.SubElement(day_element, "wind_speed_avg").text = f"{day_metrics.get('Wavg', 'N/A')} km/h"
-                ET.SubElement(day_element, "wind_direction").text = str(day_metrics.get("Wdir", "N/A"))
-                ET.SubElement(day_element, "cloud_icon_index").text = str(day_metrics.get("weather_type", "N/A"))
-                ET.SubElement(day_element, "precipitation_mm").text = f"{day_metrics.get('Precip', '0')} mm"
+                day_entry = {
+                    "date_label": day_key,
+                    "temp_max": f"{day_metrics.get('Tmax', 'N/A')}°C",
+                    "temp_min": f"{day_metrics.get('Tmin', 'N/A')}°C",
+                    "wind_speed_max": f"{day_metrics.get('Wmax', 'N/A')} km/h",
+                    "wind_speed_avg": f"{day_metrics.get('Wavg', 'N/A')} km/h",
+                    "wind_direction": str(day_metrics.get("Wdir", "N/A")),
+                    "cloud_icon_index": str(day_metrics.get("weather_type", "N/A")),
+                    "precipitation_mm": f"{day_metrics.get('Precip', '0')} mm"
+                }
+                weather_data["budapest_forecast"].append(day_entry)
         else:
             print("Budapest segment was not found in focus.json file.")
     except Exception as e:
         print(f"Failed parsing numerical forecast grid: {e}")
 
     # ==========================================
-    # 3. EXPORT CLEAN FORMATTED XML ASSET
+    # 3. EXPORT NATIVE JSON ASSET
     # ==========================================
-    xml_str = ET.tostring(root, encoding="utf-8")
-    parsed_xml = minidom.parseString(xml_str)
-    pretty_xml = parsed_xml.toprettyxml(indent="  ")
-    
-    with open("weather_data.xml", "w", encoding="utf-8") as f:
-        f.write(pretty_xml)
-    print("Success! Multi-day matrix written to weather_data.xml.")
+    with open("weather_data.json", "w", encoding="utf-8") as f:
+        json.dump(weather_data, f, ensure_ascii=False, indent=2)
+    print("Success! Native object array written to weather_data.json.")
 
 if __name__ == "__main__":
     main()
