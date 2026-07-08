@@ -1,50 +1,66 @@
 {
   "metadata": {
-    "fetched_at_epoch": 1783540678,
-    "fetched_at_human": "2026-07-08 19:57:58",
-    "radar_observed_time": "2026-07-08 19:50 UTC",
+    "fetched_at_epoch": 1783540955,
+    "fetched_at_human": "2026-07-08 20:02:35",
+    "radar_observed_time": "2026-07-08 19:55 UTC",
     "radar_image_file": "https://raw.githubusercontent.com/hatmmmmmm/met-radar-sync/main/latest_radar.png"
   },
   "budapest_forecast": [
     {
-      "date_label": "Day +1",
-      "temp_max": "26°C",
-      "temp_min": "15°C",
-      "cloud_icon_index": "2",
-      "precipitation_mm": "0 mm",
-      "wind_speed_max": "N/A"
+      "date_label": "2026-07-08",
+      "temp_max": "27°C",
+      "temp_min": "23°C",
+      "wind_speed_max": "22 km/h",
+      "cloud_icon_index": "3",
+      "precipitation_mm": "0.0 mm"
     },
     {
-      "date_label": "Day +2",
-      "temp_max": "26°C",
-      "temp_min": "15°C",
-      "cloud_icon_index": "2",
-      "precipitation_mm": "0 mm",
-      "wind_speed_max": "N/A"
+      "date_label": "2026-07-09",
+      "temp_max": "27°C",
+      "temp_min": "19°C",
+      "wind_speed_max": "20 km/h",
+      "cloud_icon_index": "3",
+      "precipitation_mm": "0.0 mm"
     },
     {
-      "date_label": "Day +3",
-      "temp_max": "26°C",
-      "temp_min": "15°C",
+      "date_label": "2026-07-10",
+      "temp_max": "31°C",
+      "temp_min": "20°C",
+      "wind_speed_max": "16 km/h",
       "cloud_icon_index": "2",
-      "precipitation_mm": "0 mm",
-      "wind_speed_max": "N/A"
+      "precipitation_mm": "0.0 mm"
     },
     {
-      "date_label": "Day +4",
-      "temp_max": "26°C",
-      "temp_min": "15°C",
-      "cloud_icon_index": "2",
-      "precipitation_mm": "0 mm",
-      "wind_speed_max": "N/A"
+      "date_label": "2026-07-11",
+      "temp_max": "31°C",
+      "temp_min": "19°C",
+      "wind_speed_max": "13 km/h",
+      "cloud_icon_index": "3",
+      "precipitation_mm": "0.0 mm"
     },
     {
-      "date_label": "Day +5",
-      "temp_max": "26°C",
-      "temp_min": "15°C",
+      "date_label": "2026-07-12",
+      "temp_max": "30°C",
+      "temp_min": "19°C",
+      "wind_speed_max": "17 km/h",
+      "cloud_icon_index": "3",
+      "precipitation_mm": "0.0 mm"
+    },
+    {
+      "date_label": "2026-07-13",
+      "temp_max": "30°C",
+      "temp_min": "19°C",
+      "wind_speed_max": "14 km/h",
+      "cloud_icon_index": "51",
+      "precipitation_mm": "1.2 mm"
+    },
+    {
+      "date_label": "2026-07-14",
+      "temp_max": "33°C",
+      "temp_min": "20°C",
+      "wind_speed_max": "8 km/h",
       "cloud_icon_index": "2",
-      "precipitation_mm": "0 mm",
-      "wind_speed_max": "N/A"
+      "precipitation_mm": "0.0 mm"
     }
   ]
 }
